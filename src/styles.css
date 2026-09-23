@@ -1,0 +1,282 @@
+/**
+ * occult-api-ui base styles.
+ *
+ * No Tailwind, no shadcn, no build-step dependency - just CSS custom
+ * properties with sensible defaults, so the library drops into any React
+ * app regardless of what styling system that app already uses. Override
+ * any --occult-* variable on a parent element (or :root) to theme it; the
+ * component markup itself never needs to change.
+ *
+ * Using shadcn/ui or Tailwind in your OWN app around these components is
+ * completely fine and common - Card/DataTable/Stat here are the equivalent
+ * of shadcn's primitives, scoped so they can't collide with yours.
+ */
+
+:root {
+  --occult-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --occult-fg: #1a1a2e;
+  --occult-fg-muted: #6b7280;
+  --occult-bg: #ffffff;
+  --occult-bg-subtle: #f8f7fc;
+  --occult-border: rgba(26, 26, 46, 0.1);
+  --occult-accent: #6d28d9;
+  --occult-accent-fg: #ffffff;
+  --occult-land: #dcd7ea;
+  --occult-radius: 12px;
+  --occult-radius-sm: 8px;
+  --occult-space: 1rem;
+}
+
+/**
+ * Dark mode follows the operating system by default, which is right for an
+ * app that has no theme switch of its own. An app that DOES have one must be
+ * able to win: most host apps track their theme with a class or attribute on
+ * a wrapper and let the reader override the OS entirely, and a component that
+ * ignored that would render a black card on a white page the moment the two
+ * disagreed. So `data-occult-theme` is honoured on ANY element, not just
+ * :root, and "light" is spelled out in full rather than relying on the :root
+ * defaults - inheriting them is not enough when the OS has already switched
+ * :root to dark.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-occult-theme="light"]) {
+    --occult-fg: #f0eef7;
+    --occult-fg-muted: #a1a1aa;
+    --occult-bg: #17151f;
+    --occult-bg-subtle: #1f1c2c;
+    --occult-border: rgba(240, 238, 247, 0.12);
+    --occult-accent: #a78bfa;
+    --occult-accent-fg: #17151f;
+    --occult-land: #332e4f;
+  }
+}
+
+[data-occult-theme="dark"] {
+  --occult-fg: #f0eef7;
+  --occult-fg-muted: #a1a1aa;
+  --occult-bg: #17151f;
+  --occult-bg-subtle: #1f1c2c;
+  --occult-border: rgba(240, 238, 247, 0.12);
+  --occult-accent: #a78bfa;
+  --occult-accent-fg: #17151f;
+  --occult-land: #332e4f;
+}
+
+[data-occult-theme="light"] {
+  --occult-fg: #1a1a2e;
+  --occult-fg-muted: #6b7280;
+  --occult-bg: #ffffff;
+  --occult-bg-subtle: #f8f7fc;
+  --occult-border: rgba(26, 26, 46, 0.1);
+  --occult-accent: #6d28d9;
+  --occult-accent-fg: #ffffff;
+  --occult-land: #dcd7ea;
+}
+
+[class^="occult-"],
+[class*=" occult-"] {
+  box-sizing: border-box;
+  font-family: var(--occult-font);
+  color: var(--occult-fg);
+}
+
+/* Card */
+.occult-card {
+  background: var(--occult-bg);
+  border: 1px solid var(--occult-border);
+  border-radius: var(--occult-radius);
+  overflow: hidden;
+}
+.occult-card__head {
+  padding: var(--occult-space) var(--occult-space) 0.5rem;
+  border-bottom: 1px solid var(--occult-border);
+  background: var(--occult-bg-subtle);
+}
+.occult-card__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.occult-card__subtitle {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--occult-fg-muted);
+}
+.occult-card__body {
+  padding: var(--occult-space);
+}
+
+/* Table */
+.occult-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  /* A 78-card tarot deck or a three-level dasha tree is hundreds of rows
+     tall, which is right in a page built around that one table and wrong in
+     a grid beside a six-row card. Set --occult-table-max-height on any
+     ancestor to cap it; unset, tables grow to their natural height exactly
+     as before. */
+  max-height: var(--occult-table-max-height, none);
+  overflow-y: auto;
+}
+.occult-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.occult-table th,
+.occult-table td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--occult-border);
+  white-space: nowrap;
+}
+.occult-table thead th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--occult-fg-muted);
+  /* Only has an effect once the wrapper above is capped and scrolling, and
+     a header that scrolls out of a 200-row table is a header nobody can use. */
+  position: sticky;
+  top: 0;
+  background: var(--occult-bg);
+}
+.occult-table--kv th[scope="row"] {
+  font-weight: 600;
+  width: 40%;
+  white-space: normal;
+}
+.occult-table td {
+  white-space: normal;
+}
+
+/* Stat */
+.occult-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.occult-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--occult-radius-sm);
+  background: var(--occult-bg-subtle);
+  min-width: 9rem;
+}
+.occult-stat__label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--occult-fg-muted);
+}
+.occult-stat__value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--occult-accent);
+}
+.occult-stat__hint {
+  font-size: 0.8rem;
+  color: var(--occult-fg-muted);
+}
+
+/* Badge */
+.occult-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--occult-bg-subtle);
+  border: 1px solid var(--occult-border);
+}
+.occult-badge--active {
+  background: var(--occult-accent);
+  color: var(--occult-accent-fg);
+  border-color: transparent;
+}
+.occult-badge--muted {
+  color: var(--occult-fg-muted);
+}
+
+/* Status */
+.occult-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--occult-fg-muted);
+}
+.occult-status--error {
+  color: #dc2626;
+}
+.occult-spinner {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 2px solid var(--occult-border);
+  border-top-color: var(--occult-accent);
+  animation: occult-spin 0.8s linear infinite;
+}
+@keyframes occult-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.occult-empty {
+  padding: 1rem;
+  font-size: 0.85rem;
+  color: var(--occult-fg-muted);
+  font-style: italic;
+}
+
+/* Wheel/diagram shared bits */
+.occult-wheel {
+  /* Every wheel renders at a fixed pixel size via width/height attributes,
+     which is what the `size` prop is for - but a card narrower than that
+     size clipped the chart rather than shrinking it. Presentational
+     attributes lose to CSS, and each one carries a viewBox, so this scales
+     them down to fit instead. `size` still sets the natural (maximum) size. */
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.occult-wheel text {
+  fill: var(--occult-fg);
+  font-family: var(--occult-font);
+}
+.occult-wheel .occult-wheel__muted {
+  fill: var(--occult-fg-muted);
+}
+.occult-wheel .occult-wheel__ring {
+  fill: none;
+  stroke: var(--occult-border);
+}
+
+.occult-space-top {
+  margin-top: 1rem;
+}
+
+/* Tarot */
+.occult-tarot-spread {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+.occult-tarot-spread__card {
+  padding: 0.75rem;
+  border-radius: var(--occult-radius-sm);
+  background: var(--occult-bg-subtle);
+}
+
+@media (max-width: 480px) {
+  .occult-table--kv th[scope="row"] {
+    width: auto;
+  }
+}

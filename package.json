@@ -1,6 +1,6 @@
 {
   "name": "occult-api-ui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "description": "Drop-in React components for the Occult API — natal charts, panchang, dashas, Human Design, numerology, tarot and more, rendered from live astrological data.",
   "type": "module",
@@ -52,7 +52,11 @@
   ],
   "license": "MIT",
   "homepage": "https://occultapi.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/occult-lab/occult-ui-sdk.git"
+  },
   "bugs": {
-    "url": "https://occultapi.com/contact"
+    "url": "https://github.com/occult-lab/occult-ui-sdk/issues"
   }
 }

@@ -18,9 +18,9 @@ export interface SynastryWheelProps extends CommonProps {
  * A real Western wheel, not a house grid: this endpoint returns tropical
  * ecliptic longitudes and cross-chart aspects, no ascendant or house cusps
  * at all - so the natural, honest rendering is a 360-degree ring, not a
- * borrowed Vedic diamond. See WesternWheelBase for the shared geometry
- * (also used by TransitBiWheel) and its note on the 0-degree-Aries-at-top
- * convention.
+ * borrowed Vedic diamond. The person is the inner ring, the partner the
+ * outer one. See WesternWheelBase for the shared drawing (also used by
+ * TransitBiWheel) and its note on turning the wheel to 0 degrees Aries.
  */
 export function SynastryWheel({ person, partner, orbFactor = 1, size = 420, className }: SynastryWheelProps) {
   const state = useOccultQuery<WesternWheelResponse>("astro/western/synastry", {
@@ -40,8 +40,8 @@ export function SynastryWheel({ person, partner, orbFactor = 1, size = 420, clas
           <WesternWheel
             data={data}
             size={size}
-            outerLabel={person.place ?? "Person A"}
-            innerLabel={partner.place ?? "Person B"}
+            innerLabel={person.place ?? "Person A"}
+            outerLabel={partner.place ?? "Person B"}
           />
         )}
       </StatusView>

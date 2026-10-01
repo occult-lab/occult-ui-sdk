@@ -4,16 +4,28 @@ import { Card } from "../primitives/Card";
 import { StatusView } from "../primitives/StatusView";
 import { useOccultQuery } from "@/lib/useOccultQuery";
 import type { BirthDetails, CommonProps } from "@/types";
+import {
+  CHART_COLOR,
+  CHART_LABELS,
+  ItemBlock,
+  VIEWBOX,
+  chartItem,
+  planetAbbr,
+  signNumber,
+  type ChartItem,
+} from "./chartShared";
 
 interface Planet {
   name: string;
   longitude: number;
   zodiac_name: string;
-  house: number;
+  house?: number | string;
+  nakshatra?: string;
 }
 
 interface Ascendant {
   zodiac_name: string;
+  longitude?: number;
 }
 
 interface ChartResponse {
@@ -21,119 +33,42 @@ interface ChartResponse {
   ascendant: Ascendant;
 }
 
-const ZODIAC_ORDER = [
-  "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-  "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces",
+/**
+ * Where yogatara-b2b's NorthIndianChart puts things, converted from its
+ * percentages to this 300x300 grid. Houses are fixed - house 1 the top
+ * diamond, running counter-clockwise (4 left, 7 bottom, 10 right) - and
+ * each shows the number of the sign in it.
+ *
+ * - `sign`: the sign number, next to the chart's centre point.
+ * - `single`: centre of the planet cluster when the house holds one item.
+ * - `top`: where a cluster of two or more starts; it then grows downward.
+ * - `room` / `width`: how far it may grow, and how wide one line may be,
+ *   before the text is shrunk to fit.
+ *
+ * Two small departures from Yogatara, so a full label ("Ra 14° (Shr)")
+ * cannot run over a line or a sign number: house 1's cluster starts a
+ * little lower (the diamond is narrow at its tip), and the side triangles'
+ * clusters sit 4 units further out with a narrower line.
+ */
+const HOUSES: { sign: [number, number]; single: [number, number]; top: number; room: number; width: number }[] = [
+  { sign: [150, 138], single: [150, 45], top: 28, room: 100, width: 64 },
+  { sign: [75, 60], single: [63, 30], top: 6, room: 50, width: 60 },
+  { sign: [60, 75], single: [32, 75], top: 58, room: 36, width: 44 },
+  { sign: [129, 150], single: [69, 180], top: 132, room: 82, width: 64 },
+  { sign: [60, 225], single: [32, 225], top: 208, room: 36, width: 44 },
+  { sign: [75, 240], single: [75, 270], top: 246, room: 50, width: 60 },
+  { sign: [150, 165], single: [150, 195], top: 189, room: 106, width: 64 },
+  { sign: [225, 240], single: [225, 270], top: 246, room: 50, width: 60 },
+  { sign: [240, 225], single: [268, 234], top: 208, room: 36, width: 44 },
+  { sign: [168, 150], single: [228, 150], top: 132, room: 82, width: 64 },
+  { sign: [240, 75], single: [268, 75], top: 58, room: 36, width: 44 },
+  { sign: [225, 60], single: [222, 30], top: 6, room: 50, width: 60 },
 ];
 
-const PLANET_ABBR: Record<string, string> = {
-  sun: "Su", moon: "Mo", mars: "Ma", mercury: "Me", jupiter: "Ju",
-  venus: "Ve", saturn: "Sa",
-  northtruenode: "Ra", northmeannode: "Ra",
-  southtruenode: "Ke", southmeannode: "Ke",
-  uranus: "Ur", neptune: "Ne", pluto: "Pl",
-};
-
-/**
- * The classic North Indian ("diamond") chart layout: a fixed grid of 12
- * houses - kendras (1/4/7/10) as the four inner kites, the rest as the
- * eight corner triangles - with the ascendant's sign always in house 1 and
- * every other sign following in order. This exact polygon set
- * (HOUSE_POLYGONS below) is the one already live in panchang-web's
- * NorthIndianChart component; it is ported here rather than re-derived,
- * because a subtly-wrong chart geometry is a worse defect than no chart at
- * all, and this shape is already proven correct in production.
- */
-const HOUSE_POLYGONS: Record<number, string> = {
-  1: "50,0 75,25 50,50 25,25",
-  2: "0,0 50,0 25,25",
-  3: "0,0 25,25 0,50",
-  4: "0,50 25,25 50,50 25,75",
-  5: "0,50 25,75 0,100",
-  6: "0,100 25,75 50,100",
-  7: "50,100 25,75 50,50 75,75",
-  8: "50,100 75,75 100,100",
-  9: "100,100 75,75 100,50",
-  10: "100,50 75,75 50,50 75,25",
-  11: "100,50 75,25 100,0",
-  12: "100,0 75,25 50,0",
-};
-
-/**
- * Percentage positions for the house-number and planet-list labels. Ported
- * verbatim from panchang-web's NorthIndianChart (`numberPositions` and
- * `planetPositions`), not re-tuned by eye here - a first attempt at
- * inventing these from scratch produced visibly overlapping labels, which
- * is exactly the outcome porting the already-validated tables avoids.
- */
-const NUMBER_POS: Record<number, { top: string; left: string }> = {
-  1: { top: "46%", left: "50%" },
-  2: { top: "20%", left: "25%" },
-  3: { top: "25%", left: "20%" },
-  4: { top: "50%", left: "43%" },
-  5: { top: "75%", left: "20%" },
-  6: { top: "80%", left: "25%" },
-  7: { top: "55%", left: "50%" },
-  8: { top: "80%", left: "75%" },
-  9: { top: "75%", left: "80%" },
-  10: { top: "50%", left: "56%" },
-  11: { top: "25%", left: "80%" },
-  12: { top: "20%", left: "75%" },
-};
-
-/** Percentage position of the planet-list cluster within each house. */
-const PLANET_POS: Record<number, { top: string; left: string }> = {
-  1: { top: "15%", left: "50%" },
-  2: { top: "10%", left: "21%" },
-  3: { top: "25%", left: "12%" },
-  4: { top: "60%", left: "23%" },
-  5: { top: "75%", left: "12%" },
-  6: { top: "90%", left: "25%" },
-  7: { top: "65%", left: "50%" },
-  8: { top: "90%", left: "75%" },
-  9: { top: "78%", left: "88%" },
-  10: { top: "50%", left: "76%" },
-  11: { top: "25%", left: "88%" },
-  12: { top: "10%", left: "74%" },
-};
-
-/**
- * `chart_name` -> display label, for every divisional chart the API's own
- * `chart_name` enum documents (seen on /api/astro/ashtakvarga/'s field
- * list, which is the one endpoint that publishes it - /api/astro/
- * planet-positions/ accepts the same values but doesn't enumerate them).
- * This is what lets one component be "the chart wheel" rather than one
- * component per division.
- */
-const CHART_LABELS: Record<string, string> = {
-  RashiChart: "Rashi (D-1)",
-  BhavaChart: "Bhava",
-  HoraChart: "Hora (D-2)",
-  DrekkanaChart: "Drekkana (D-3)",
-  ChaturthamsaChart: "Chaturthamsa (D-4)",
-  PanchamsaChart: "Panchamsa (D-5)",
-  ShashthamsaChart: "Shashthamsa (D-6)",
-  SaptamsaChart: "Saptamsa (D-7)",
-  AshtamsaChart: "Ashtamsa (D-8)",
-  NavamsaChart: "Navamsa (D-9)",
-  DasamsaChart: "Dasamsa (D-10)",
-  RudramsaChart: "Rudramsa (D-11)",
-  DwadasamsaChart: "Dwadasamsa (D-12)",
-  ShodasamsaChart: "Shodasamsa (D-16)",
-  VimsamsaChart: "Vimsamsa (D-20)",
-  ChaturvimsamsaChart: "Chaturvimsamsa (D-24)",
-  NakshatramsaChart: "Nakshatramsa (D-27)",
-  TrimsamsaChart: "Trimsamsa (D-30)",
-  KhavedamsaChart: "Khavedamsa (D-40)",
-  AkshavedamsaChart: "Akshavedamsa (D-45)",
-  ShashtyamsaChart: "Shashtyamsa (D-60)",
-  NavnavamsaChart: "Navnavamsa (D-81)",
-  NavnavamsaChartNew: "Navnavamsa (D-81)",
-  AstottaramsaChart: "Astottaramsa (D-108)",
-  AstottaramsaChartNew: "Astottaramsa (D-108)",
-  DwadasdwadasamsaChart: "Dwadasdwadasamsa (D-144)",
-  DwadasdwadasamsaChartNew: "Dwadasdwadasamsa (D-144)",
-};
+/** Yogatara's planet text: bold, 2.8% of the chart width, line-height 1.05. */
+const FONT = 8.4;
+/** The cluster's top padding (Tailwind p-1 at the reference size). */
+const CLUSTER_PAD = 3.3;
 
 export interface NatalChartWheelProps extends BirthDetails, CommonProps {
   /**
@@ -150,10 +85,6 @@ export interface NatalChartWheelProps extends BirthDetails, CommonProps {
   title?: string;
 }
 
-function signNumber(name: string): number {
-  return ZODIAC_ORDER.indexOf(name) + 1;
-}
-
 function normalizeSign(n: number): number {
   let v = n;
   while (v > 12) v -= 12;
@@ -161,13 +92,22 @@ function normalizeSign(n: number): number {
   return v;
 }
 
+/** The API's house when it sends one, else counted from the ascendant sign. */
+function houseOf(planet: Planet, ascSign: number): number {
+  const h = typeof planet.house === "string" ? parseInt(planet.house, 10) : planet.house;
+  if (typeof h === "number" && h >= 1 && h <= 12) return h;
+  const s = signNumber(planet.zodiac_name);
+  return s && ascSign ? normalizeSign(s - ascSign + 1) : 0;
+}
+
 /**
  * The North Indian natal chart wheel - the diagram every Vedic astrology
- * site opens with. Positions come from /api/astro/planet-positions/
- * (verified live); the API does not render a diagram itself despite
- * documenting `render: "svg"` on that endpoint (tested - the field is
- * accepted but no svg ever comes back), so this draws it client-side
- * from the same plain numbers every other component in this library uses.
+ * site opens with, drawn the way yogatara-b2b draws it. Positions come from
+ * /api/astro/planet-positions/ (verified live); the API does not render a
+ * diagram itself despite documenting `render: "svg"` on that endpoint
+ * (tested - the field is accepted but no svg ever comes back), so this
+ * draws it client-side from the same plain numbers every other component
+ * in this library uses.
  */
 export function NatalChartWheel({
   date,
@@ -194,86 +134,74 @@ export function NatalChartWheel({
       <StatusView state={state}>
         {(data) => {
           const ascSign = signNumber(data.ascendant.zodiac_name);
-          const signForHouse: Record<number, number> = {};
-          for (let h = 1; h <= 12; h++) {
-            signForHouse[h] = normalizeSign(ascSign + h - 1);
-          }
 
-          const planetsByHouse: Record<number, Planet[]> = {};
+          // Yogatara puts the ascendant first in house 1 ("As 27° (Chi)"),
+          // then the planets in API order.
+          const itemsByHouse: Record<number, ChartItem[]> = {};
+          if (ascSign) {
+            itemsByHouse[1] = [
+              chartItem("asc", "As", data.ascendant.longitude ?? NaN, data.ascendant.zodiac_name, CHART_COLOR.ascendant),
+            ];
+          }
           for (const planet of data.planets) {
-            const h = planet.house;
-            if (!h || h < 1 || h > 12) continue;
-            (planetsByHouse[h] ??= []).push(planet);
+            const h = houseOf(planet, ascSign);
+            if (!h) continue;
+            (itemsByHouse[h] ??= []).push(
+              chartItem(planet.name, planetAbbr(planet.name), planet.longitude, planet.zodiac_name, CHART_COLOR.planet, planet.nakshatra),
+            );
           }
 
           return (
-            <div
+            <svg
+              viewBox={VIEWBOX}
               className="occult-wheel"
-              style={{ position: "relative", width: size, height: size, margin: "0 auto" }}
+              role="img"
+              aria-label={`${CHART_LABELS[chartName] ?? chartName}, North Indian style`}
+              style={{ display: "block", width: "100%", maxWidth: size, height: "auto", margin: "0 auto" }}
             >
-              <svg viewBox="0 0 100 100" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-                <polygon
-                  points="50,0 100,50 50,100 0,50"
-                  fill="none"
-                  stroke="var(--occult-border)"
-                  strokeWidth="0.6"
-                />
-                <rect x="0" y="0" width="100" height="100" fill="none" stroke="var(--occult-border)" strokeWidth="0.6" />
-                <line x1="0" y1="0" x2="100" y2="100" stroke="var(--occult-border)" strokeWidth="0.4" />
-                <line x1="100" y1="0" x2="0" y2="100" stroke="var(--occult-border)" strokeWidth="0.4" />
-              </svg>
-
-              {Object.entries(HOUSE_POLYGONS).map(([house]) => {
-                const h = Number(house);
-                const pos = NUMBER_POS[h] ?? { top: "50%", left: "50%" };
+              <rect x={0} y={0} width={300} height={300} fill="none" stroke={CHART_COLOR.line} strokeWidth={0.8} />
+              <path
+                d="M150 0 L300 150 L150 300 L0 150 Z M0 0 L300 300 M300 0 L0 300"
+                fill="none"
+                stroke={CHART_COLOR.line}
+                strokeWidth={0.6}
+              />
+              {HOUSES.map((pos, i) => {
+                const h = i + 1;
+                const items = itemsByHouse[h] ?? [];
+                const multi = items.length > 1;
                 return (
-                  <div
-                    key={`sign-${h}`}
-                    style={{
-                      position: "absolute",
-                      top: pos.top,
-                      left: pos.left,
-                      transform: "translate(-50%, -50%)",
-                      fontSize: "0.65rem",
-                      color: "var(--occult-fg-muted)",
-                    }}
-                  >
-                    {signForHouse[h]}
-                  </div>
-                );
-              })}
-
-              {Object.entries(HOUSE_POLYGONS).map(([house]) => {
-                const h = Number(house);
-                const pos = PLANET_POS[h] ?? { top: "50%", left: "50%" };
-                const planets = planetsByHouse[h] ?? [];
-                return (
-                  <div
-                    key={`planets-${h}`}
-                    style={{
-                      position: "absolute",
-                      top: pos.top,
-                      left: pos.left,
-                      transform: "translate(-50%, -50%)",
-                      display: "flex",
-                      flexWrap: "wrap",
-                      justifyContent: "center",
-                      gap: "0 0.25rem",
-                      width: "2.6rem",
-                    }}
-                  >
-                    {planets.map((p) => (
-                      <span
-                        key={p.name}
-                        style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--occult-accent)", whiteSpace: "nowrap" }}
+                  <g key={h}>
+                    {ascSign > 0 && (
+                      <text
+                        x={pos.sign[0]}
+                        y={pos.sign[1]}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fontSize={10}
+                        fontWeight={400}
+                        style={{ fill: CHART_COLOR.line }}
                       >
-                        {PLANET_ABBR[p.name] ?? p.name.slice(0, 2)}
-                      </span>
-                    ))}
-                  </div>
+                        {normalizeSign(ascSign + h - 1)}
+                      </text>
+                    )}
+                    <ItemBlock
+                      items={items}
+                      x={pos.single[0]}
+                      y={multi ? pos.top + CLUSTER_PAD : pos.single[1]}
+                      anchor={multi ? "top" : "middle"}
+                      maxWidth={pos.width}
+                      maxHeight={pos.room}
+                      fontSize={FONT}
+                      minFontSize={5.5}
+                      lineHeight={1.05}
+                      rowGap={1.7}
+                      itemGap={5}
+                    />
+                  </g>
                 );
               })}
-            </div>
+            </svg>
           );
         }}
       </StatusView>

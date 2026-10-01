@@ -280,3 +280,290 @@
     width: auto;
   }
 }
+
+/* ------------------------------------------------------------------------
+ * Human Design bodygraph (components/humanDesign/Bodygraph.tsx)
+ *
+ * The SVG itself uses Human Design's fixed colours (from the Yogatara B2B
+ * bodygraph) on its own light silhouette, so it reads on any card. These
+ * variables cover only the HTML around it: the Design/Personality column
+ * titles and glyphs, and a ring that keeps the near-black Personality
+ * legend swatch visible on a dark card. Light defaults are Yogatara's values.
+ * ------------------------------------------------------------------------ */
+:root {
+  --occult-hd-design-text: #d0473f;
+  --occult-hd-personality-text: #3a3a3a;
+  --occult-hd-swatch-ring: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-occult-theme="light"]) {
+    --occult-hd-design-text: #e8655c;
+    --occult-hd-personality-text: #d4d4d8;
+    --occult-hd-swatch-ring: rgba(240, 238, 247, 0.45);
+  }
+}
+[data-occult-theme="dark"] {
+  --occult-hd-design-text: #e8655c;
+  --occult-hd-personality-text: #d4d4d8;
+  --occult-hd-swatch-ring: rgba(240, 238, 247, 0.45);
+}
+[data-occult-theme="light"] {
+  --occult-hd-design-text: #d0473f;
+  --occult-hd-personality-text: #3a3a3a;
+  --occult-hd-swatch-ring: transparent;
+}
+
+/* Laid out by the card's width, not the window's: narrow (phones) stacks
+   graph, Design, Personality; from 560px the two tables sit side by side
+   under the graph; from 900px it is Design | graph | Personality. */
+.occult-bodygraph {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.occult-bodygraph__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 0.75rem;
+}
+.occult-bodygraph__graph {
+  order: 1;
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: var(--occult-bodygraph-size, 360px);
+  margin: 0 auto;
+}
+.occult-bodygraph__design {
+  order: 2;
+  min-width: 0;
+}
+.occult-bodygraph__personality {
+  order: 3;
+  min-width: 0;
+}
+@container (min-width: 560px) {
+  .occult-bodygraph__layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 900px) {
+  .occult-bodygraph__layout {
+    grid-template-columns: minmax(0, 280px) minmax(260px, var(--occult-bodygraph-size, 360px)) minmax(0, 280px);
+    justify-content: center;
+    gap: 1.25rem;
+  }
+  .occult-bodygraph__design {
+    order: 1;
+  }
+  .occult-bodygraph__graph {
+    order: 2;
+    grid-column: auto;
+  }
+}
+
+.occult-bodygraph__table {
+  width: 100%;
+  min-width: 0;
+}
+.occult-bodygraph__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.occult-bodygraph__row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  column-gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--occult-bg-subtle);
+}
+.occult-bodygraph__row--head {
+  margin-bottom: 4px;
+  padding-top: 0;
+  padding-bottom: 0;
+  background: none;
+}
+.occult-bodygraph__th {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--occult-fg-muted);
+}
+.occult-bodygraph__cell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.occult-bodygraph__cell--baseline {
+  align-items: baseline;
+}
+.occult-bodygraph__glyph {
+  width: 1rem;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1;
+}
+.occult-bodygraph__name,
+.occult-bodygraph__gatename {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.occult-bodygraph__name {
+  font-size: 12px;
+}
+.occult-bodygraph__code {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.occult-bodygraph__gatename {
+  font-size: 11px;
+  color: var(--occult-fg-muted);
+}
+
+.occult-bodygraph__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 1rem;
+  font-size: 0.75rem;
+}
+.occult-bodygraph__key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--occult-fg-muted);
+}
+.occult-bodygraph__swatch,
+.occult-bodygraph__dot {
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--occult-hd-swatch-ring);
+}
+.occult-bodygraph__swatch {
+  width: 24px;
+  height: 10px;
+}
+.occult-bodygraph__dot {
+  width: 12px;
+  height: 12px;
+}
+
+/* ------------------------------------------------------------------------
+ * Astrological wheels (components/western/wheelWestern.tsx and
+ * components/vedic/wheelCircular.tsx: WesternNatalWheel, TransitBiWheel,
+ * SynastryWheel, KpChartWheel)
+ *
+ * Drawn as the Yogatara B2B app draws its wheels, in its chart colours. The
+ * light defaults are Yogatara's light --chart-* values and the dark ones its
+ * own dark values; every one of them is too dark (or, for the cream lagna
+ * tint, too bright) to use unchanged on the SDK's dark card.
+ * ------------------------------------------------------------------------ */
+:root {
+  --occult-wheel-border: #312e81;
+  --occult-wheel-label: #171717;
+  --occult-wheel-planet: #b90000;
+  --occult-wheel-ascendant: #c2410c;
+  --occult-wheel-arudha: #1e40af;
+  --occult-wheel-lagna: #6b21a8;
+  --occult-wheel-upagraha: #166534;
+  --occult-wheel-cream: #fdf8e5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-occult-theme="light"]) {
+    --occult-wheel-border: #818cf8;
+    --occult-wheel-label: #f4f4f5;
+    --occult-wheel-planet: #f87171;
+    --occult-wheel-ascendant: #fb923c;
+    --occult-wheel-arudha: #60a5fa;
+    --occult-wheel-lagna: #c084fc;
+    --occult-wheel-upagraha: #4ade80;
+    --occult-wheel-cream: #451a03;
+  }
+}
+[data-occult-theme="dark"] {
+  --occult-wheel-border: #818cf8;
+  --occult-wheel-label: #f4f4f5;
+  --occult-wheel-planet: #f87171;
+  --occult-wheel-ascendant: #fb923c;
+  --occult-wheel-arudha: #60a5fa;
+  --occult-wheel-lagna: #c084fc;
+  --occult-wheel-upagraha: #4ade80;
+  --occult-wheel-cream: #451a03;
+}
+[data-occult-theme="light"] {
+  --occult-wheel-border: #312e81;
+  --occult-wheel-label: #171717;
+  --occult-wheel-planet: #b90000;
+  --occult-wheel-ascendant: #c2410c;
+  --occult-wheel-arudha: #1e40af;
+  --occult-wheel-lagna: #6b21a8;
+  --occult-wheel-upagraha: #166534;
+  --occult-wheel-cream: #fdf8e5;
+}
+
+/* `size` sets the natural (maximum) size; a narrower card scales it down.
+   Fills are set per element, so there is no blanket `text { fill }` here. */
+.occult-astro-wheel {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  font-family: var(--occult-font);
+}
+/* Astrological symbols as text, never colour emoji (the glyphs also carry
+   U+FE0E). Symbol fonts first so the browser does not reach for an emoji
+   font when the UI font lacks the glyph. */
+.occult-astro-wheel .occult-astro-wheel__glyph {
+  font-family: "Segoe UI Symbol", "Noto Sans Symbols", "Noto Sans Symbols 2", "Apple Symbols", "DejaVu Sans", var(--occult-font);
+  font-variant-emoji: text;
+}
+
+/*
+ * North / South Indian charts (NatalChartWheel, SouthIndianChartWheel).
+ * Colours copied from yogatara-b2b: --chart-border (lines and sign
+ * numbers) and --chart-label (South Indian centre label) from
+ * app/globals.css; planet and lagna colours from the defaults in
+ * lib/settings/chartSettings.ts, which the app applies at runtime. Light
+ * values are Yogatara's light theme; the dark overrides are Yogatara's own
+ * dark-theme values, since #312e81 lines and #171717 text disappear on a
+ * dark card.
+ */
+:root {
+  --occult-chart-line: #312e81;
+  --occult-chart-planet: #b90000;
+  --occult-chart-ascendant: #6b21a8;
+  --occult-chart-label: #171717;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-occult-theme="light"]) {
+    --occult-chart-line: #818cf8;
+    --occult-chart-planet: #f87171;
+    --occult-chart-ascendant: #c084fc;
+    --occult-chart-label: #f4f4f5;
+  }
+}
+[data-occult-theme="dark"] {
+  --occult-chart-line: #818cf8;
+  --occult-chart-planet: #f87171;
+  --occult-chart-ascendant: #c084fc;
+  --occult-chart-label: #f4f4f5;
+}
+[data-occult-theme="light"] {
+  --occult-chart-line: #312e81;
+  --occult-chart-planet: #b90000;
+  --occult-chart-ascendant: #6b21a8;
+  --occult-chart-label: #171717;
+}

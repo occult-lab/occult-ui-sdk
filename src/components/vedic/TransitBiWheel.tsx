@@ -16,13 +16,13 @@ export interface TransitBiWheelProps extends CommonProps {
 }
 
 /**
- * The natal chart (outer ring, filled dots) against a second moment's
- * planetary positions (inner ring, outlined dots) - "what's happening in
- * the sky against my birth chart right now". This is the same computation
- * as synastry (two sets of tropical positions plus the aspects between
- * them), just with the second "person" being a moment rather than a
- * birth - so it reuses /api/astro/western/synastry/ and WesternWheelBase's
- * rendering rather than a separate transit-specific endpoint or component.
+ * The natal chart (inner ring) against a second moment's planetary
+ * positions (outer ring) - "what's happening in the sky against my birth
+ * chart right now". This is the same computation as synastry (two sets of
+ * tropical positions plus the aspects between them), just with the second
+ * "person" being a moment rather than a birth - so it reuses
+ * /api/astro/western/synastry/ and WesternWheelBase's rendering rather than
+ * a separate transit-specific endpoint or component.
  * `astro/western/synastry` needs a place for the "partner" too, but since
  * it returns pure geocentric longitudes (no house cusps), the natal
  * chart's own coordinates are reused rather than asking the caller for a
@@ -47,7 +47,7 @@ export function TransitBiWheel({ natal, asOf, orbFactor = 1, size = 420, classNa
   return (
     <Card title="Transit Bi-Wheel" subtitle={natal.place} className={className}>
       <StatusView state={state}>
-        {(data) => <WesternWheel data={data} size={size} outerLabel="Natal" innerLabel="Transit" />}
+        {(data) => <WesternWheel data={data} size={size} innerLabel="Natal" outerLabel="Transit" />}
       </StatusView>
     </Card>
   );

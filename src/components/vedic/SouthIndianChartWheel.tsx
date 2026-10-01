@@ -4,14 +4,26 @@ import { Card } from "../primitives/Card";
 import { StatusView } from "../primitives/StatusView";
 import { useOccultQuery } from "@/lib/useOccultQuery";
 import type { BirthDetails, CommonProps } from "@/types";
+import {
+  CHART_COLOR,
+  CHART_LABELS,
+  ItemBlock,
+  VIEWBOX,
+  chartItem,
+  planetAbbr,
+  type ChartItem,
+} from "./chartShared";
 
 interface Planet {
   name: string;
+  longitude: number;
   zodiac_name: string;
+  nakshatra?: string;
 }
 
 interface Ascendant {
   zodiac_name: string;
+  longitude?: number;
 }
 
 interface ChartResponse {
@@ -19,33 +31,14 @@ interface ChartResponse {
   ascendant: Ascendant;
 }
 
-const PLANET_ABBR: Record<string, string> = {
-  sun: "Su", moon: "Mo", mars: "Ma", mercury: "Me", jupiter: "Ju",
-  venus: "Ve", saturn: "Sa",
-  northtruenode: "Ra", northmeannode: "Ra",
-  southtruenode: "Ke", southmeannode: "Ke",
-  uranus: "Ur", neptune: "Ne", pluto: "Pl",
-};
-
-/**
- * Sign abbreviations, ported from yogatara-b2b's NorthIndianChart.tsx
- * signMap rather than a naive `.slice(0, 2)` - which was tried first here
- * and is wrong: it gives Cancer and Capricorn both "Ca", indistinguishable
- * in the corner label. This table is what disambiguates every sign to a
- * genuinely unique two letters.
- */
-const SIGN_ABBR: Record<string, string> = {
-  Aries: "Ar", Taurus: "Ta", Gemini: "Ge", Cancer: "Cn", Leo: "Le", Virgo: "Vi",
-  Libra: "Li", Scorpio: "Sc", Sagittarius: "Sg", Capricorn: "Cp", Aquarius: "Aq", Pisces: "Pi",
-};
-
 /**
  * South Indian style is the opposite of North Indian: SIGNS are fixed to
  * these twelve perimeter cells forever (Pisces always top-left, Virgo
- * always bottom-right); what moves chart to chart is which house number
- * and which planets land in each cell. Ported from yogatara-b2b's
- * SOUTH_INDIAN_CELL_SIGN (lib/dashboard/southIndian.ts) - a fixed mapping,
- * not something to recompute per chart.
+ * always bottom-right); what moves chart to chart is which planets land in
+ * each cell. Ported from yogatara-b2b's SOUTH_INDIAN_CELL_SIGN
+ * (lib/dashboard/southIndian.ts) - a fixed mapping, not something to
+ * recompute per chart. Like Yogatara, the cells carry no sign labels: the
+ * layout itself says which sign each one is.
  */
 const CELL_SIGN = [
   "Pisces", "Aries", "Taurus", "Gemini",
@@ -54,16 +47,45 @@ const CELL_SIGN = [
   "Sagittarius", "Scorpio", "Libra", "Virgo",
 ] as const;
 
-const CELL_SIZE = 100;
-/** Top-left corner of each of the 12 perimeter cells, in a 400x400 viewBox
- *  4x4 grid with the center 2x2 left empty. */
+const CELL = 75;
+
+/** Top-left corner of each perimeter cell on the 300x300 grid, in CELL_SIGN
+ *  order: clockwise from Pisces in the top-left, the centre 2x2 left empty. */
 const PERIMETER: [number, number][] = [
-  [0, 0], [CELL_SIZE, 0], [CELL_SIZE * 2, 0], [CELL_SIZE * 3, 0],
-  [0, CELL_SIZE], [CELL_SIZE * 3, CELL_SIZE],
-  [0, CELL_SIZE * 2], [CELL_SIZE * 3, CELL_SIZE * 2],
-  [0, CELL_SIZE * 3], [CELL_SIZE, CELL_SIZE * 3],
-  [CELL_SIZE * 2, CELL_SIZE * 3], [CELL_SIZE * 3, CELL_SIZE * 3],
+  [0, 0], [CELL, 0], [CELL * 2, 0], [CELL * 3, 0],
+  [0, CELL], [CELL * 3, CELL],
+  [0, CELL * 2], [CELL * 3, CELL * 2],
+  [0, CELL * 3], [CELL, CELL * 3], [CELL * 2, CELL * 3], [CELL * 3, CELL * 3],
 ];
+
+/** Yogatara draws on 1000x1000; this grid is 300x300. */
+const K = 0.3;
+const LINE_WIDTH = 2 * K;
+
+/**
+ * Yogatara's cell font: 34 units, stepped down by how many characters the
+ * cell holds so a crowded sign stays inside its box, never below 16.
+ */
+function cellFontSize(items: ChartItem[]): number {
+  // Counted Yogatara's way: abbreviation + 4 for " 29°" + 7 for " (Ash)".
+  const chars = items.reduce((n, item) => {
+    const abbr = item.text.split(" ")[0] ?? "";
+    return n + abbr.length + (item.text.includes("°") ? 4 : 0) + (item.text.includes("(") ? 7 : 0);
+  }, 0);
+  let fs = 34;
+  if (chars > 60) fs *= 0.55;
+  else if (chars > 45) fs *= 0.65;
+  else if (chars > 30) fs *= 0.75;
+  else if (chars > 20) fs *= 0.82;
+  else if (chars > 12) fs *= 0.9;
+  else if (chars > 6) fs *= 0.95;
+  return Math.max(16, Math.round(fs)) * K;
+}
+
+/** Yogatara's centre label: "Rashi" for the natal chart, else the division's name. */
+function centreLabel(chartName: string): string {
+  return (CHART_LABELS[chartName] ?? chartName).replace(/\s*\(.*\)$/, "");
+}
 
 export interface SouthIndianChartWheelProps extends BirthDetails, CommonProps {
   chartName?: string;
@@ -73,8 +95,9 @@ export interface SouthIndianChartWheelProps extends BirthDetails, CommonProps {
 }
 
 /**
- * The South Indian ("box") chart layout - fixed sign positions, a rotating
- * ascendant marker instead of a rotating house grid. Same data source as
+ * The South Indian ("box") chart layout, drawn the way yogatara-b2b draws
+ * it - fixed sign positions, the ascendant written into its sign's cell as
+ * "AS", the chart's name in the empty centre. Same data source as
  * NatalChartWheel (/api/astro/planet-positions/), different, genuinely
  * distinct geometry - not a restyle of the North Indian component.
  */
@@ -102,54 +125,100 @@ export function SouthIndianChartWheel({
     <Card title={title} subtitle={place} className={className}>
       <StatusView state={state}>
         {(data) => {
-          const planetsBySign: Record<string, Planet[]> = {};
-          for (const planet of data.planets) {
-            (planetsBySign[planet.zodiac_name] ??= []).push(planet);
+          // Ascendant first, then planets - Yogatara's KIND_ORDER.
+          const itemsBySign: Record<string, ChartItem[]> = {};
+          const asc = data.ascendant;
+          if (asc.zodiac_name) {
+            itemsBySign[asc.zodiac_name] = [
+              chartItem("asc", "AS", asc.longitude ?? NaN, asc.zodiac_name, CHART_COLOR.ascendant),
+            ];
           }
-          const ascendantSign = data.ascendant.zodiac_name;
+          for (const planet of data.planets) {
+            if (!planet.zodiac_name) continue;
+            (itemsBySign[planet.zodiac_name] ??= []).push(
+              chartItem(planet.name, planetAbbr(planet.name), planet.longitude, planet.zodiac_name, CHART_COLOR.planet, planet.nakshatra),
+            );
+          }
+
+          const label = centreLabel(chartName);
+          const labelSize = (label.length > 10 ? 35 : label.length > 6 ? 40 : 50) * K;
 
           return (
             <svg
-              viewBox="0 0 400 400"
-              style={{ width: size, height: size, margin: "0 auto", display: "block" }}
+              viewBox={VIEWBOX}
               className="occult-wheel"
+              role="img"
+              aria-label="South Indian chart"
+              style={{ display: "block", width: "100%", maxWidth: size, height: "auto", margin: "0 auto" }}
             >
+              <rect
+                x={K}
+                y={K}
+                width={300 - 2 * K}
+                height={300 - 2 * K}
+                rx={20 * K}
+                fill="none"
+                stroke={CHART_COLOR.line}
+                strokeWidth={LINE_WIDTH}
+              />
               {CELL_SIGN.map((sign, i) => {
                 const cell = PERIMETER[i];
                 if (!cell) return null;
                 const [x, y] = cell;
-                const planets = planetsBySign[sign] ?? [];
-                const isAscendant = sign === ascendantSign;
+                const items = itemsBySign[sign] ?? [];
                 return (
                   <g key={sign}>
                     <rect
                       x={x}
                       y={y}
-                      width={CELL_SIZE}
-                      height={CELL_SIZE}
+                      width={CELL}
+                      height={CELL}
                       fill="none"
-                      stroke={isAscendant ? "var(--occult-accent)" : "var(--occult-border)"}
-                      strokeWidth={isAscendant ? 1.5 : 0.6}
+                      stroke={CHART_COLOR.line}
+                      strokeWidth={LINE_WIDTH}
                     />
-                    <text x={x + 4} y={y + 12} fontSize={7} fill="var(--occult-fg-muted)">
-                      {SIGN_ABBR[sign] ?? sign.slice(0, 2)}
-                    </text>
-                    <text
-                      x={x + CELL_SIZE / 2}
-                      y={y + CELL_SIZE / 2 + 3}
-                      textAnchor="middle"
-                      fontSize={9}
-                      fontWeight={700}
-                      fill="var(--occult-accent)"
-                    >
-                      {planets.map((p) => PLANET_ABBR[p.name] ?? p.name.slice(0, 2)).join(" ")}
-                    </text>
+                    <ItemBlock
+                      items={items}
+                      x={x + CELL / 2}
+                      y={y + CELL / 2}
+                      anchor="middle"
+                      maxWidth={69}
+                      maxHeight={70}
+                      fontSize={cellFontSize(items)}
+                      minFontSize={16 * K}
+                      lineHeight={1.1}
+                      rowGap={4 * K}
+                      itemGap={8 * K}
+                    />
                   </g>
                 );
               })}
-              <rect x={CELL_SIZE} y={CELL_SIZE} width={CELL_SIZE * 2} height={CELL_SIZE * 2} fill="none" stroke="var(--occult-border)" strokeWidth={0.6} />
-              <text x={200} y={200} textAnchor="middle" fontSize={11} fill="var(--occult-fg-muted)">
-                Rashi
+              <rect
+                x={CELL}
+                y={CELL}
+                width={CELL * 2}
+                height={CELL * 2}
+                fill="none"
+                stroke={CHART_COLOR.line}
+                strokeWidth={LINE_WIDTH}
+              />
+              <text
+                x={150}
+                y={150}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={labelSize}
+                fontWeight={400}
+                style={{ fill: CHART_COLOR.label }}
+              >
+                {label.length > 14 ? (
+                  <>
+                    <tspan x={150} dy="-0.6em">{label.slice(0, 14)}</tspan>
+                    <tspan x={150} dy="1.2em">{label.slice(14)}</tspan>
+                  </>
+                ) : (
+                  label
+                )}
               </text>
             </svg>
           );
